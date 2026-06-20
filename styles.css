@@ -296,3 +296,37 @@ input:focus, select:focus { outline: 2px solid var(--primary); }
 .print-sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; padding: 20px; }
 .print-card { text-align: center; border: 1px dashed #999; padding: 12px; border-radius: 8px; }
 .print-card p { margin: 4px 0; font-size: 13px; }
+
+/* ===================== ATTENDANCE MATRIX ===================== */
+.matrix-table { min-width: max-content; }
+.matrix-table th, .matrix-table td { white-space: nowrap; }
+.matrix-name-col { min-width: 140px; }
+.matrix-day-hdr { font-size: 11px; padding: 6px 4px; text-align: center; min-width: 44px; }
+.matrix-hdr-past { background: var(--surface); }
+.matrix-hdr-today { background: rgba(105,193,31,0.18); font-weight: 700; }
+.matrix-hdr-future { background: var(--bg); color: var(--muted); }
+.matrix-cell {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px;
+  font-weight: 700; font-size: 13px; cursor: default;
+}
+td .matrix-cell { margin: 0 auto; }
+td.matrix-cell { text-align: center; }
+.cell-present { background: #bbf7d0; color: #15803d; }
+[data-theme="dark"] .cell-present { background: #14532d; color: #4ade80; }
+.cell-absent { background: #fecaca; color: #dc2626; }
+[data-theme="dark"] .cell-absent { background: #450a0a; color: #f87171; }
+.cell-future { background: var(--surface); color: var(--muted); }
+.cell-today { outline: 2px solid var(--primary); outline-offset: -2px; }
+.matrix-summary { font-weight: 600; text-align: center; }
+.rate-good { color: #16a34a; }
+.rate-warn { color: #d97706; }
+.rate-bad { color: #dc2626; }
+.matrix-legend { display: flex; gap: 16px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+
+/* ===================== DASHBOARD EXTRAS ===================== */
+.stat-card-warn { border-left: 4px solid #f59e0b; }
+.stat-card-danger { border-left: 4px solid #ef4444; }
+.card-head-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.card-head-row h3 { margin: 0; }

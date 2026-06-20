@@ -1,0 +1,6 @@
+StudentID,FirstName,LastName,Email,Phone,Group
+STD001,John,Doe,john.doe@example.com,+1234567890,Group A
+STD002,Jane,Smith,jane.smith@example.com,+1234567891,Group A
+STD003,Ahmed,Khan,ahmed.khan@example.com,+1234567892,Group B
+STD004,Maria,Garcia,maria.garcia@example.com,+1234567893,Group B
+STD005,Liam,Brown,liam.brown@example.com,+1234567894,Group C

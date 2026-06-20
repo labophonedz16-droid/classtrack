@@ -70,6 +70,28 @@
           <div><div class="stat-value" id="statActiveCourse">-</div><div class="stat-label">Active Course</div></div>
         </div>
       </div>
+      <div class="stat-grid" id="dashboardSessionsGrid" style="display:none">
+        <div class="stat-card stat-card-warn">
+          <div class="stat-icon" style="background:#f59e0b">📅</div>
+          <div><div class="stat-value" id="statPassedSessions">0</div><div class="stat-label">Past Course Sessions</div></div>
+        </div>
+        <div class="stat-card stat-card-danger">
+          <div class="stat-icon" style="background:#ef4444">🚫</div>
+          <div><div class="stat-value" id="statYesterdayAbsent">0</div><div class="stat-label">Absent Yesterday</div></div>
+        </div>
+      </div>
+      <div class="card" id="dashboardAbsentCard" style="display:none">
+        <div class="card-head-row">
+          <h3>Yesterday's Absences</h3>
+          <span class="muted" id="dashboardYesterdayLabel"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="dashboardAbsentTable">
+            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th><th>Course</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
       <div class="card">
         <h3>Attendance Trend (Last 7 Days)</h3>
         <canvas id="trendChart" height="100"></canvas>
@@ -106,6 +128,7 @@
           <p class="muted">Manage student records and QR codes</p>
         </div>
         <div class="btn-group">
+          <button class="btn btn-outline" onclick="downloadExampleCSV()">⬇ Download Example CSV</button>
           <button class="btn btn-outline" onclick="document.getElementById('csvInput').click()">⬆ Import CSV</button>
           <input type="file" id="csvInput" accept=".csv" style="display:none" />
           <button class="btn btn-outline" onclick="printAllQR()">🖨 Print All QR</button>
@@ -167,7 +190,32 @@
         <h1>Reports</h1>
         <p class="muted">Generate and export attendance reports</p>
       </div>
+
+      <!-- Attendance Matrix -->
       <div class="card">
+        <div class="card-head-row">
+          <h3>📊 Attendance Matrix</h3>
+          <span class="muted">Students vs Course Days</span>
+        </div>
+        <div class="filters-row wrap" style="margin-bottom:12px">
+          <select id="matrixCourse"><option value="">Select Course...</option></select>
+          <select id="matrixGroup"><option value="">All Groups</option></select>
+          <button class="btn btn-primary" onclick="runAttendanceMatrix()">Generate Matrix</button>
+          <button class="btn btn-outline" onclick="exportMatrixCSV()">Export CSV</button>
+        </div>
+        <div class="matrix-legend">
+          <span class="legend-item"><span class="matrix-cell cell-present">✓</span> Present</span>
+          <span class="legend-item"><span class="matrix-cell cell-absent">✗</span> Absent (past)</span>
+          <span class="legend-item"><span class="matrix-cell cell-future">–</span> Not yet</span>
+        </div>
+        <div class="table-wrap" id="matrixWrap">
+          <p class="muted" style="padding:24px;text-align:center">Select a course and click Generate Matrix</p>
+        </div>
+      </div>
+
+      <!-- Classic Report -->
+      <div class="card">
+        <h3>📋 Attendance Log</h3>
         <div class="filters-row wrap">
           <select id="reportCourse"><option value="">All Courses</option></select>
           <select id="reportStudent"><option value="">All Students</option></select>

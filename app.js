@@ -212,7 +212,82 @@ function renderDashboard() {
   const activeCourse = DB.courses.find(c => c.status === "Ongoing");
   document.getElementById("statActiveCourse").textContent = activeCourse ? activeCourse.courseName : "None";
 
+  // --- Past sessions & absences panel ---
+  renderDashboardSessionsPanel(activeCourse);
   renderTrendChart();
+}
+
+function getCourseDays(course) {
+  // Returns an array of YYYY-MM-DD strings for each day from startDate to endDate (inclusive),
+  // skipping weekends. If the course has no weekend pattern info we include all calendar days.
+  if (!course || !course.startDate || !course.endDate) return [];
+  const days = [];
+  const end = new Date(course.endDate + "T00:00:00");
+  let cur = new Date(course.startDate + "T00:00:00");
+  while (cur <= end) {
+    days.push(formatDate(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
+
+function renderDashboardSessionsPanel(activeCourse) {
+  const grid = document.getElementById("dashboardSessionsGrid");
+  const absentCard = document.getElementById("dashboardAbsentCard");
+
+  if (!activeCourse) {
+    grid.style.display = "none";
+    absentCard.style.display = "none";
+    return;
+  }
+
+  const todayStr = formatDate(new Date());
+  const allDays = getCourseDays(activeCourse);
+  const passedDays = allDays.filter(d => d < todayStr);
+
+  document.getElementById("statPassedSessions").textContent = passedDays.length;
+  grid.style.display = "";
+
+  // Yesterday's absences
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayStr = formatDate(yesterdayDate);
+
+  // Only show if yesterday was a course day
+  if (!passedDays.includes(yesterdayStr)) {
+    document.getElementById("statYesterdayAbsent").textContent = "–";
+    absentCard.style.display = "none";
+    return;
+  }
+
+  const attendedYesterday = new Set(
+    DB.attendance.filter(a => a.date === yesterdayStr && a.courseId === activeCourse.courseId)
+      .map(a => a.studentId)
+  );
+
+  // Students in the course group (or all students if no group filter on course)
+  const courseStudents = activeCourse.group
+    ? DB.students.filter(s => s.group === activeCourse.group)
+    : DB.students;
+
+  const absentStudents = courseStudents.filter(s => !attendedYesterday.has(s.studentId));
+  document.getElementById("statYesterdayAbsent").textContent = absentStudents.length;
+
+  if (absentStudents.length === 0) {
+    absentCard.style.display = "none";
+    return;
+  }
+
+  absentCard.style.display = "";
+  document.getElementById("dashboardYesterdayLabel").textContent = yesterdayStr;
+  const tbody = document.querySelector("#dashboardAbsentTable tbody");
+  tbody.innerHTML = absentStudents.map(s => `
+    <tr>
+      <td>${escapeHtml(s.studentId)}</td>
+      <td>${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</td>
+      <td>${escapeHtml(s.group)}</td>
+      <td>${escapeHtml(activeCourse.courseName)}</td>
+    </tr>`).join("");
 }
 
 function renderTrendChart() {
@@ -653,6 +728,20 @@ function bindCsvImport() {
     refreshAllData();
   });
 }
+function downloadExampleCSV() {
+  const header = ["StudentID", "FirstName", "LastName", "Email", "Phone", "Group"];
+  const examples = [
+    ["STD001", "John", "Doe", "john.doe@example.com", "+1234567890", "Group A"],
+    ["STD002", "Jane", "Smith", "jane.smith@example.com", "+1234567891", "Group A"],
+    ["STD003", "Ahmed", "Khan", "ahmed.khan@example.com", "+1234567892", "Group B"],
+    ["STD004", "Maria", "Garcia", "maria.garcia@example.com", "+1234567893", "Group B"],
+    ["STD005", "Liam", "Brown", "liam.brown@example.com", "+1234567894", "Group C"]
+  ];
+  const lines = [header.join(",")].concat(examples.map(r => r.map(csvEscape).join(",")));
+  downloadFile("students_example.csv", lines.join("\n"), "text/csv");
+  showToast("Example CSV downloaded — fill it in and import!");
+}
+
 function parseCSV(text) {
   return text.trim().split(/\r?\n/).map(line => line.split(","));
 }
@@ -865,14 +954,144 @@ function populateReportFilters() {
   const courseSel = document.getElementById("reportCourse");
   const studentSel = document.getElementById("reportStudent");
   const groupSel = document.getElementById("reportGroup");
+  const matrixCourse = document.getElementById("matrixCourse");
+  const matrixGroup = document.getElementById("matrixGroup");
 
   courseSel.innerHTML = '<option value="">All Courses</option>' +
     DB.courses.map(c => `<option value="${escapeAttr(c.courseId)}">${escapeHtml(c.courseName)}</option>`).join("");
   studentSel.innerHTML = '<option value="">All Students</option>' +
     DB.students.map(s => `<option value="${escapeAttr(s.studentId)}">${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</option>`).join("");
   const groups = [...new Set(DB.students.map(s => s.group).filter(Boolean))];
-  groupSel.innerHTML = '<option value="">All Groups</option>' + groups.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join("");
+  const groupOptions = '<option value="">All Groups</option>' + groups.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join("");
+  groupSel.innerHTML = groupOptions;
+
+  // Matrix filters
+  matrixCourse.innerHTML = '<option value="">Select Course...</option>' +
+    DB.courses.map(c => `<option value="${escapeAttr(c.courseId)}">${escapeHtml(c.courseName)}</option>`).join("");
+  matrixGroup.innerHTML = groupOptions;
 }
+
+/* ===================== ATTENDANCE MATRIX ===================== */
+let lastMatrixData = null;
+
+function runAttendanceMatrix() {
+  const courseId = document.getElementById("matrixCourse").value;
+  const group = document.getElementById("matrixGroup").value;
+  const wrap = document.getElementById("matrixWrap");
+
+  if (!courseId) {
+    showToast("Please select a course first", true);
+    return;
+  }
+
+  const course = DB.courses.find(c => c.courseId === courseId);
+  if (!course) { showToast("Course not found", true); return; }
+
+  const allDays = getCourseDays(course);
+  if (!allDays.length) {
+    wrap.innerHTML = '<p class="muted" style="padding:24px;text-align:center">Course has no valid date range</p>';
+    return;
+  }
+
+  const todayStr = formatDate(new Date());
+
+  // Students to show
+  let students = course.group
+    ? DB.students.filter(s => s.group === course.group)
+    : DB.students;
+  if (group) students = students.filter(s => s.group === group);
+  if (!students.length) {
+    wrap.innerHTML = '<p class="muted" style="padding:24px;text-align:center">No students found for this selection</p>';
+    return;
+  }
+
+  // Build attendance lookup: Set of "studentId|date"
+  const attended = new Set(
+    DB.attendance
+      .filter(a => a.courseId === courseId)
+      .map(a => a.studentId + "|" + a.date)
+  );
+
+  // Build table
+  const shortDays = allDays.map(d => {
+    const parts = d.split("-");
+    return parts[2] + "/" + parts[1]; // DD/MM
+  });
+
+  let html = `<table class="data-table matrix-table"><thead><tr>
+    <th class="matrix-name-col">Student</th>
+    <th>ID</th>
+    <th>Group</th>`;
+  shortDays.forEach((label, i) => {
+    const day = allDays[i];
+    let cls = day < todayStr ? "matrix-hdr-past" : day === todayStr ? "matrix-hdr-today" : "matrix-hdr-future";
+    html += `<th class="matrix-day-hdr ${cls}">${label}</th>`;
+  });
+  // Summary columns
+  html += `<th class="matrix-summary">Present</th><th class="matrix-summary">Absent</th><th class="matrix-summary">Rate</th></tr></thead><tbody>`;
+
+  const matrixRows = [];
+  students.forEach(s => {
+    const pastDays = allDays.filter(d => d < todayStr);
+    let presentCount = 0;
+    let absentCount = 0;
+
+    let row = `<tr>
+      <td class="matrix-name-col">${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</td>
+      <td>${escapeHtml(s.studentId)}</td>
+      <td>${escapeHtml(s.group)}</td>`;
+
+    allDays.forEach(day => {
+      const key = s.studentId + "|" + day;
+      const wasPresent = attended.has(key);
+      if (day < todayStr) {
+        if (wasPresent) { presentCount++; row += `<td class="matrix-cell cell-present" title="${day}">✓</td>`; }
+        else { absentCount++; row += `<td class="matrix-cell cell-absent" title="${day}">✗</td>`; }
+      } else if (day === todayStr) {
+        if (wasPresent) { presentCount++; row += `<td class="matrix-cell cell-present cell-today" title="Today">✓</td>`; }
+        else { row += `<td class="matrix-cell cell-today" title="Today">·</td>`; }
+      } else {
+        row += `<td class="matrix-cell cell-future" title="${day}">–</td>`;
+      }
+    });
+
+    const totalPast = pastDays.length;
+    const rate = totalPast > 0 ? Math.round((presentCount / totalPast) * 100) : 0;
+    const rateCls = rate >= 80 ? "rate-good" : rate >= 60 ? "rate-warn" : "rate-bad";
+    row += `<td class="matrix-summary">${presentCount}</td><td class="matrix-summary">${absentCount}</td><td class="matrix-summary ${rateCls}">${rate}%</td></tr>`;
+    html += row;
+
+    matrixRows.push({ student: s, days: allDays, attended, presentCount, absentCount, rate });
+  });
+
+  html += "</tbody></table>";
+  wrap.innerHTML = html;
+  lastMatrixData = { course, students, allDays, attended, todayStr };
+}
+
+function exportMatrixCSV() {
+  if (!lastMatrixData) { showToast("Generate matrix first", true); return; }
+  const { course, students, allDays, attended, todayStr } = lastMatrixData;
+  const shortDays = allDays.map(d => { const p = d.split("-"); return p[2]+"/"+p[1]; });
+  const header = ["StudentID", "Name", "Group", ...shortDays, "Present", "Absent", "Rate%"];
+  const lines = [header.join(",")];
+  students.forEach(s => {
+    const row = [s.studentId, `${s.firstName} ${s.lastName}`, s.group];
+    let present = 0, absent = 0;
+    allDays.forEach(day => {
+      const key = s.studentId + "|" + day;
+      if (day < todayStr) { if (attended.has(key)) { row.push("Present"); present++; } else { row.push("Absent"); absent++; } }
+      else if (day === todayStr) { row.push(attended.has(key) ? "Present" : "Today"); if (attended.has(key)) present++; }
+      else { row.push("Upcoming"); }
+    });
+    const total = allDays.filter(d => d < todayStr).length;
+    const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+    row.push(present, absent, rate + "%");
+    lines.push(row.map(csvEscape).join(","));
+  });
+  downloadFile(`attendance_matrix_${course.courseName.replace(/\s+/g,"_")}.csv`, lines.join("\n"), "text/csv");
+}
+
 
 let lastReportRows = [];
 function runReport() {
