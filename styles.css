@@ -216,7 +216,16 @@ input:focus, select:focus { outline: 2px solid var(--primary); }
 /* ===================== SCANNER ===================== */
 .scanner-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; }
 .scanner-card { text-align: center; }
-#qr-reader { width: 100%; max-width: 420px; margin: 0 auto 16px; border-radius: 12px; overflow: hidden; }
+#qr-reader {
+  width: 100%;
+  max-width: 420px;
+  min-height: 280px;
+  margin: 0 auto 16px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+#qr-reader video { width: 100% !important; border-radius: 12px; }
 .scanner-controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 16px; }
 .manual-entry { display: flex; gap: 10px; max-width: 420px; margin: 0 auto; }
 .scan-result-card { display: flex; align-items: center; justify-content: center; min-height: 260px; }
@@ -228,6 +237,9 @@ input:focus, select:focus { outline: 2px solid var(--primary); }
 .scan-result-success { background: rgba(105,193,31,.12); border: 1px solid var(--primary); }
 .scan-result-error { background: rgba(220,38,38,.1); border: 1px solid #dc2626; }
 .scan-result-icon { font-size: 42px; margin-bottom: 8px; }
+
+#qrModalCanvas { display: inline-block; background: #fff; padding: 16px; border-radius: 8px; }
+.mini-qr { display: inline-block; background: #fff; padding: 3px; border-radius: 4px; line-height: 0; }
 
 /* ===================== TOAST ===================== */
 .toast-container { position: fixed; top: 76px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }

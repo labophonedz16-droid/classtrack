@@ -440,6 +440,24 @@ function populateLevelFilters() {
 }
 
 /* ===================== QR CODE: VIEW / DOWNLOAD / PRINT ===================== */
+
+// QR codes need a blank white "quiet zone" border around them or scanners
+// (especially phone cameras) cannot detect the finder patterns. qrcodejs
+// renders edge-to-edge with no margin, so we bake one on here before the
+// image is ever downloaded, printed, or otherwise exported.
+function getPaddedQRDataUrl(containerEl, padding = 24) {
+  const srcEl = containerEl.querySelector("img") || containerEl.querySelector("canvas");
+  const size = srcEl.tagName === "CANVAS" ? srcEl.width : srcEl.naturalWidth;
+  const out = document.createElement("canvas");
+  out.width = size + padding * 2;
+  out.height = size + padding * 2;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(srcEl, padding, padding, size, size);
+  return out.toDataURL("image/png");
+}
+
 function viewQR(studentId) {
   const s = DB.students.find(x => x.studentId === studentId);
   if (!s) return;
@@ -452,8 +470,8 @@ function viewQR(studentId) {
 }
 function downloadCurrentQR() {
   if (!currentQRStudent) return;
-  const img = document.querySelector("#qrModalCanvas img") || document.querySelector("#qrModalCanvas canvas");
-  const url = img.tagName === "CANVAS" ? img.toDataURL("image/png") : img.src;
+  const holder = document.getElementById("qrModalCanvas");
+  const url = getPaddedQRDataUrl(holder, 24);
   const a = document.createElement("a");
   a.href = url;
   a.download = `QR_${currentQRStudent.studentId}.png`;
@@ -461,8 +479,8 @@ function downloadCurrentQR() {
 }
 function printCurrentQR() {
   if (!currentQRStudent) return;
-  const img = document.querySelector("#qrModalCanvas img") || document.querySelector("#qrModalCanvas canvas");
-  const src = img.tagName === "CANVAS" ? img.toDataURL("image/png") : img.src;
+  const holder = document.getElementById("qrModalCanvas");
+  const src = getPaddedQRDataUrl(holder, 24);
   const w = window.open("", "_blank");
   w.document.write(`
     <html><head><title>Print QR</title></head>
@@ -478,27 +496,33 @@ function printCurrentQR() {
 function printAllQR() {
   const container = document.getElementById("printAllContainer");
   container.innerHTML = "";
+  const cards = [];
   DB.students.forEach(s => {
-    const card = document.createElement("div");
-    card.className = "print-card";
     const qrHolder = document.createElement("div");
-    card.appendChild(qrHolder);
-    const p1 = document.createElement("p"); p1.innerHTML = `<strong>${s.firstName} ${s.lastName}</strong>`;
-    const p2 = document.createElement("p"); p2.textContent = s.studentId;
-    card.appendChild(p1); card.appendChild(p2);
-    container.appendChild(card);
+    container.appendChild(qrHolder);
     new QRCode(qrHolder, { text: JSON.stringify({ studentId: s.studentId }), width: 120, height: 120 });
+    cards.push({ student: s, holder: qrHolder });
   });
 
   setTimeout(() => {
+    const cardsHtml = cards.map(({ student, holder }) => {
+      const src = getPaddedQRDataUrl(holder, 16);
+      return `<div class="print-card">
+        <img src="${src}" />
+        <p><strong>${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</strong></p>
+        <p>${escapeHtml(student.studentId)}</p>
+      </div>`;
+    }).join("");
+
     const w = window.open("", "_blank");
     w.document.write(`<html><head><title>Print All QR Codes</title>
       <style>
         body { font-family: sans-serif; }
         .print-sheet { display:grid; grid-template-columns: repeat(3,1fr); gap: 24px; padding: 20px; }
         .print-card { text-align:center; border:1px dashed #999; padding:12px; border-radius:8px; }
+        .print-card img { width: 120px; height: 120px; }
       </style></head><body>
-      <div class="print-sheet">${container.innerHTML}</div>
+      <div class="print-sheet">${cardsHtml}</div>
       <script>window.onload = () => window.print();</script>
       </body></html>`);
     w.document.close();
