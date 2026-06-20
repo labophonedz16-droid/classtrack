@@ -659,13 +659,68 @@ function parseCSV(text) {
 
 /* ===================== SCANNER ===================== */
 function bindScannerButtons() {
-  document.getElementById("startScanBtn").addEventListener("click", startScanner);
+  document.getElementById("startScanBtn").addEventListener("click", () => {
+    getAudioCtx(); // unlock/resume audio on this user gesture so beeps work
+    startScanner();
+  });
   document.getElementById("stopScanBtn").addEventListener("click", stopScanner);
   document.getElementById("manualCheckBtn").addEventListener("click", () => {
+    getAudioCtx();
     const id = document.getElementById("manualStudentId").value.trim();
     if (id) { handleScannedId(id); document.getElementById("manualStudentId").value = ""; }
   });
 }
+/* ===================== SOUND EFFECTS ===================== */
+// Generated entirely with the Web Audio API — no audio files needed,
+// works offline, and loads instantly. AudioContext must be created/resumed
+// after a user gesture (we do it on "Start Camera" click) to satisfy
+// browser autoplay policies.
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq, duration, type = "sine", delay = 0, volume = 0.25) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.value = volume;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const startTime = ctx.currentTime + delay;
+    osc.start(startTime);
+    gain.gain.setValueAtTime(volume, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+    osc.stop(startTime + duration);
+  } catch (e) { /* audio not available — fail silently */ }
+}
+
+// Short high beep — played the instant a QR code is decoded, before the
+// backend call even completes. Confirms "I saw your code" immediately.
+function playScanBeep() {
+  playTone(1400, 0.08, "square", 0, 0.18);
+}
+
+// Pleasant two-note ascending chime — played once attendance is
+// successfully recorded on the backend.
+function playSuccessSound() {
+  playTone(880, 0.12, "sine", 0, 0.22);
+  playTone(1320, 0.16, "sine", 0.1, 0.22);
+}
+
+// Lower descending buzz — played for "Already Checked In" or errors.
+function playErrorSound() {
+  playTone(420, 0.18, "sawtooth", 0, 0.18);
+  playTone(280, 0.22, "sawtooth", 0.12, 0.18);
+}
+
 function startScanner() {
   html5QrCode = new Html5Qrcode("qr-reader", {
     // Use the browser's native BarcodeDetector API when available — it's
@@ -694,6 +749,7 @@ function startScanner() {
     { facingMode: "environment" },
     config,
     (decodedText) => {
+      playScanBeep(); // instant feedback the instant a code is read
       let studentId = decodedText;
       try {
         const parsed = JSON.parse(decodedText);
@@ -734,6 +790,7 @@ async function handleScannedId(studentId) {
 
     if (res.success) {
       const d = res.data;
+      playSuccessSound(); // attendance confirmed and saved
       resultCard.innerHTML = `
         <div class="scan-result-success">
           <div class="scan-result-icon">✅</div>
@@ -749,6 +806,7 @@ async function handleScannedId(studentId) {
         </div>`;
     } else if (res.code === "ALREADY_CHECKED_IN") {
       const d = res.data || {};
+      playErrorSound();
       resultCard.innerHTML = `
         <div class="scan-result-error">
           <div class="scan-result-icon">⚠️</div>
@@ -763,15 +821,18 @@ async function handleScannedId(studentId) {
           <p class="muted">${escapeHtml(res.message)}</p>
         </div>`;
     } else {
+      playErrorSound();
       resultCard.innerHTML = `
         <div class="scan-result-error">
           <div class="scan-result-icon">❌</div>
           <h3>Check-in Failed</h3>
           <p>${escapeHtml(res.message || "Unknown error")}</p>
+
         </div>`;
     }
     refreshAllData();
   } catch (err) {
+    playErrorSound();
     resultCard.innerHTML = `<div class="scan-result-error"><div class="scan-result-icon">❌</div><h3>Error</h3><p>${escapeHtml(err.message)}</p></div>`;
   }
 }
