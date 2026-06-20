@@ -667,11 +667,15 @@ function bindScannerButtons() {
   });
 }
 function startScanner() {
-  html5QrCode = new Html5Qrcode("qr-reader");
+  html5QrCode = new Html5Qrcode("qr-reader", {
+    // Use the browser's native BarcodeDetector API when available — it's
+    // hardware-accelerated and significantly faster than the pure-JS
+    // decoder html5-qrcode falls back to otherwise.
+    useBarCodeDetectorIfSupported: true,
+    verbose: false
+  });
 
   // Responsive qrbox: never exceeds the actual video viewfinder size.
-  // This fixes scans silently failing on phones where a fixed 240px
-  // box can be larger than the rendered camera preview.
   const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
     const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
     const boxSize = Math.floor(minEdge * 0.7);
@@ -679,10 +683,11 @@ function startScanner() {
   };
 
   const config = {
-    fps: 10,
+    fps: 20,                 // more scan attempts per second (was 10)
     qrbox: qrboxFunction,
     aspectRatio: 1.0,
-    disableFlip: false
+    disableFlip: true,       // skip mirrored-image decode attempt — codes aren't mirrored in real life, this halves the work per frame
+    formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] // skip checking for barcodes/other formats every frame
   };
 
   html5QrCode.start(
@@ -713,6 +718,7 @@ function stopScanner() {
     });
   }
 }
+
 
 let lastScanTime = 0;
 async function handleScannedId(studentId) {
