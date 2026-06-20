@@ -553,9 +553,26 @@ function bindScannerButtons() {
 }
 function startScanner() {
   html5QrCode = new Html5Qrcode("qr-reader");
+
+  // Responsive qrbox: never exceeds the actual video viewfinder size.
+  // This fixes scans silently failing on phones where a fixed 240px
+  // box can be larger than the rendered camera preview.
+  const qrboxFunction = (viewfinderWidth, viewfinderHeight) => {
+    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+    const boxSize = Math.floor(minEdge * 0.7);
+    return { width: boxSize, height: boxSize };
+  };
+
+  const config = {
+    fps: 10,
+    qrbox: qrboxFunction,
+    aspectRatio: 1.0,
+    disableFlip: false
+  };
+
   html5QrCode.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 240 },
+    config,
     (decodedText) => {
       let studentId = decodedText;
       try {
@@ -564,11 +581,14 @@ function startScanner() {
       } catch (e) { /* plain text id */ }
       handleScannedId(studentId);
     },
-    () => {}
+    () => { /* scan failure callback fires constantly while searching — ignore */ }
   ).then(() => {
     document.getElementById("startScanBtn").disabled = true;
     document.getElementById("stopScanBtn").disabled = false;
-  }).catch(err => showToast("Camera error: " + err, true));
+  }).catch(err => {
+    showToast("Camera error: " + err, true);
+    console.error("Camera start error:", err);
+  });
 }
 function stopScanner() {
   if (html5QrCode) {
