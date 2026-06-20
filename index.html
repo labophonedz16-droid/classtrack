@@ -89,7 +89,7 @@
         <div class="table-wrap">
           <table class="data-table" id="coursesTable">
             <thead><tr>
-              <th>Course</th><th>Subject</th><th>Level</th><th>Teacher</th>
+              <th>Course</th><th>Subject</th><th>Group</th><th>Teacher</th>
               <th>Duration</th><th>Start</th><th>End</th><th>Status</th><th>Actions</th>
             </tr></thead>
             <tbody></tbody>
@@ -115,12 +115,12 @@
       <div class="card">
         <div class="filters-row">
           <input type="text" id="studentSearch" placeholder="🔍 Search by ID, name, email..." />
-          <select id="studentLevelFilter"><option value="">All Levels</option></select>
+          <select id="studentGroupFilter"><option value="">All Groups</option></select>
         </div>
         <div class="table-wrap">
           <table class="data-table" id="studentsTable">
             <thead><tr>
-              <th>QR</th><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Level</th><th>Actions</th>
+              <th>QR</th><th>Student ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Group</th><th>Actions</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -154,7 +154,7 @@
         <h3>Recent Check-ins (Today)</h3>
         <div class="table-wrap">
           <table class="data-table" id="recentAttendanceTable">
-            <thead><tr><th>Student ID</th><th>Name</th><th>Course</th><th>Time</th></tr></thead>
+            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th><th>Course</th><th>Time</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -171,7 +171,7 @@
         <div class="filters-row wrap">
           <select id="reportCourse"><option value="">All Courses</option></select>
           <select id="reportStudent"><option value="">All Students</option></select>
-          <select id="reportLevel"><option value="">All Levels</option></select>
+          <select id="reportGroup"><option value="">All Groups</option></select>
           <input type="date" id="reportStart" />
           <input type="date" id="reportEnd" />
           <select id="reportType">
@@ -239,7 +239,7 @@
       <div class="form-grid">
         <div class="form-field"><label>Course Name</label><input type="text" id="courseName" /></div>
         <div class="form-field"><label>Subject</label><input type="text" id="courseSubject" /></div>
-        <div class="form-field"><label>Level</label><input type="text" id="courseLevel" /></div>
+        <div class="form-field"><label>Group</label><input type="text" id="courseGroup" list="groupsDatalist" placeholder="e.g. Group A" /></div>
         <div class="form-field"><label>Teacher</label><input type="text" id="courseTeacher" /></div>
         <div class="form-field"><label>Duration (days)</label><input type="number" id="courseDuration" /></div>
         <div class="form-field"><label>Start Date</label><input type="date" id="courseStart" /></div>
@@ -273,9 +273,10 @@
         <div class="form-field"><label>Last Name</label><input type="text" id="studentLastName" /></div>
         <div class="form-field"><label>Email</label><input type="email" id="studentEmail" /></div>
         <div class="form-field"><label>Phone</label><input type="text" id="studentPhone" /></div>
-        <div class="form-field"><label>Level</label><input type="text" id="studentLevel" /></div>
+        <div class="form-field"><label>Group</label><input type="text" id="studentGroup" list="groupsDatalist" placeholder="e.g. Group A" /></div>
       </div>
     </div>
+    <datalist id="groupsDatalist"></datalist>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeModal('studentModalOverlay')">Cancel</button>
       <button class="btn btn-primary" onclick="saveStudent()">Save Student</button>
@@ -286,14 +287,15 @@
 <!-- QR View Modal -->
 <div class="modal-overlay" id="qrModalOverlay">
   <div class="modal modal-sm">
-    <div class="modal-head"><h3>Student QR Code</h3><button class="icon-btn" onclick="closeModal('qrModalOverlay')">✕</button></div>
+    <div class="modal-head"><h3>Student ID Card</h3><button class="icon-btn" onclick="closeModal('qrModalOverlay')">✕</button></div>
     <div class="modal-body" style="text-align:center">
-      <div id="qrModalCanvas"></div>
-      <p id="qrModalLabel" class="muted"></p>
+      <div id="qrModalCanvas" style="display:none"></div>
+      <img id="idCardPreview" alt="Student ID Card" style="max-width:100%;border-radius:12px;box-shadow:var(--shadow);" />
     </div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="downloadCurrentQR()">⬇ Download</button>
-      <button class="btn btn-primary" onclick="printCurrentQR()">🖨 Print</button>
+      <button class="btn btn-outline" onclick="printCurrentQR()">🖨 Print</button>
+      <button class="btn btn-primary" onclick="shareCurrentQR()">📤 Share</button>
     </div>
   </div>
 </div>

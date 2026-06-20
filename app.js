@@ -193,7 +193,7 @@ async function refreshAllData() {
     renderCoursesTable();
     renderStudentsTable();
     renderRecentAttendance();
-    populateLevelFilters();
+    populateGroupFilters();
   } catch (err) {
     setConnStatus(false);
     showToast("Failed to load data: " + err.message, true);
@@ -252,7 +252,7 @@ function openCourseModal(course) {
   document.getElementById("courseId").value = course ? course.courseId : "";
   document.getElementById("courseName").value = course ? course.courseName : "";
   document.getElementById("courseSubject").value = course ? course.subject : "";
-  document.getElementById("courseLevel").value = course ? course.level : "";
+  document.getElementById("courseGroup").value = course ? course.group : "";
   document.getElementById("courseTeacher").value = course ? course.teacher : "";
   document.getElementById("courseDuration").value = course ? course.duration : "";
   document.getElementById("courseStart").value = course ? course.startDate : "";
@@ -267,7 +267,7 @@ async function saveCourse() {
     courseId: id || ("CRS" + Date.now()),
     courseName: document.getElementById("courseName").value.trim(),
     subject: document.getElementById("courseSubject").value.trim(),
-    level: document.getElementById("courseLevel").value.trim(),
+    group: document.getElementById("courseGroup").value.trim(),
     teacher: document.getElementById("courseTeacher").value.trim(),
     duration: document.getElementById("courseDuration").value.trim(),
     startDate: document.getElementById("courseStart").value,
@@ -297,7 +297,7 @@ function renderCoursesTable() {
     tr.innerHTML = `
       <td>${escapeHtml(c.courseName)}</td>
       <td>${escapeHtml(c.subject)}</td>
-      <td>${escapeHtml(c.level)}</td>
+      <td>${escapeHtml(c.group)}</td>
       <td>${escapeHtml(c.teacher)}</td>
       <td>${escapeHtml(c.duration)} d</td>
       <td>${escapeHtml(c.startDate)}</td>
@@ -343,7 +343,7 @@ function openStudentModal(student) {
   document.getElementById("studentLastName").value = student ? student.lastName : "";
   document.getElementById("studentEmail").value = student ? student.email : "";
   document.getElementById("studentPhone").value = student ? student.phone : "";
-  document.getElementById("studentLevel").value = student ? student.level : "";
+  document.getElementById("studentGroup").value = student ? student.group : "";
   openModal("studentModalOverlay");
 }
 
@@ -355,7 +355,7 @@ async function saveStudent() {
     lastName: document.getElementById("studentLastName").value.trim(),
     email: document.getElementById("studentEmail").value.trim(),
     phone: document.getElementById("studentPhone").value.trim(),
-    level: document.getElementById("studentLevel").value.trim()
+    group: document.getElementById("studentGroup").value.trim()
   };
   if (!payload.studentId || !payload.firstName) {
     showToast("Student ID and First Name are required", true); return;
@@ -378,12 +378,12 @@ function renderStudentsTable() {
   const tbody = document.querySelector("#studentsTable tbody");
   tbody.innerHTML = "";
   const search = (document.getElementById("studentSearch")?.value || "").toLowerCase();
-  const levelFilter = document.getElementById("studentLevelFilter")?.value || "";
+  const groupFilter = document.getElementById("studentGroupFilter")?.value || "";
 
   const filtered = DB.students.filter(s => {
     const matchesSearch = !search || [s.studentId, s.firstName, s.lastName, s.email].join(" ").toLowerCase().includes(search);
-    const matchesLevel = !levelFilter || s.level === levelFilter;
-    return matchesSearch && matchesLevel;
+    const matchesGroup = !groupFilter || s.group === groupFilter;
+    return matchesSearch && matchesGroup;
   });
 
   filtered.forEach(s => {
@@ -394,7 +394,7 @@ function renderStudentsTable() {
       <td>${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</td>
       <td>${escapeHtml(s.email)}</td>
       <td>${escapeHtml(s.phone)}</td>
-      <td>${escapeHtml(s.level)}</td>
+      <td>${escapeHtml(s.group)}</td>
       <td>
         <button class="btn btn-sm btn-outline" onclick='viewQR("${escapeAttr(s.studentId)}")'>QR</button>
         <button class="btn btn-sm btn-outline" onclick='editStudentById("${escapeAttr(s.studentId)}")'>Edit</button>
@@ -429,33 +429,94 @@ async function deleteStudent(id) {
 
 function bindStudentSearch() {
   document.getElementById("studentSearch")?.addEventListener("input", renderStudentsTable);
-  document.getElementById("studentLevelFilter")?.addEventListener("change", renderStudentsTable);
+  document.getElementById("studentGroupFilter")?.addEventListener("change", renderStudentsTable);
 }
-function populateLevelFilters() {
-  const levels = [...new Set(DB.students.map(s => s.level).filter(Boolean))];
-  const sel = document.getElementById("studentLevelFilter");
+function populateGroupFilters() {
+  const groups = [...new Set([
+    ...DB.students.map(s => s.group),
+    ...DB.courses.map(c => c.group)
+  ].filter(Boolean))];
+
+  const sel = document.getElementById("studentGroupFilter");
   if (sel) {
-    sel.innerHTML = '<option value="">All Levels</option>' + levels.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join("");
+    sel.innerHTML = '<option value="">All Groups</option>' + groups.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join("");
+  }
+
+  const datalist = document.getElementById("groupsDatalist");
+  if (datalist) {
+    datalist.innerHTML = groups.map(g => `<option value="${escapeAttr(g)}"></option>`).join("");
   }
 }
 
-/* ===================== QR CODE: VIEW / DOWNLOAD / PRINT ===================== */
+/* ===================== STUDENT ID CARD GENERATION ===================== */
 
 // QR codes need a blank white "quiet zone" border around them or scanners
 // (especially phone cameras) cannot detect the finder patterns. qrcodejs
-// renders edge-to-edge with no margin, so we bake one on here before the
-// image is ever downloaded, printed, or otherwise exported.
-function getPaddedQRDataUrl(containerEl, padding = 24) {
-  const srcEl = containerEl.querySelector("img") || containerEl.querySelector("canvas");
-  const size = srcEl.tagName === "CANVAS" ? srcEl.width : srcEl.naturalWidth;
-  const out = document.createElement("canvas");
-  out.width = size + padding * 2;
-  out.height = size + padding * 2;
-  const ctx = out.getContext("2d");
+// renders a <canvas> (preferred, always present in modern browsers) and an
+// <img> fallback that mirrors it — we must read from the CANVAS, not the
+// img, otherwise the source can be blank/stale and produce a "borderless"
+// or broken export. This was the root cause of previous scan failures.
+function getQrCanvasOrImg(containerEl) {
+  return containerEl.querySelector("canvas") || containerEl.querySelector("img");
+}
+
+// Renders a full "Student ID Card" style image: school header bar,
+// full name, group, and a properly-quiet-zoned QR code underneath.
+function buildIdCardCanvas(student, qrSourceEl) {
+  const W = 480, H = 680;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // background
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, out.width, out.height);
-  ctx.drawImage(srcEl, padding, padding, size, size);
-  return out.toDataURL("image/png");
+  ctx.fillRect(0, 0, W, H);
+
+  // header bar
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, "#69C11F");
+  grad.addColorStop(1, "#4CAF15");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, 110);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 24px Segoe UI, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(SETTINGS.schoolName || "QR Attendance", W / 2, 50);
+  ctx.font = "14px Segoe UI, Arial, sans-serif";
+  ctx.fillText("Student Identification Card", W / 2, 78);
+
+  // full name
+  ctx.fillStyle = "#16201A";
+  ctx.font = "bold 26px Segoe UI, Arial, sans-serif";
+  const fullName = `${student.firstName || ""} ${student.lastName || ""}`.trim();
+  ctx.fillText(fullName, W / 2, 160);
+
+  // group + student id
+  ctx.font = "16px Segoe UI, Arial, sans-serif";
+  ctx.fillStyle = "#5B6B5F";
+  ctx.fillText(`Group: ${student.group || "-"}`, W / 2, 190);
+  ctx.fillText(`ID: ${student.studentId}`, W / 2, 214);
+
+  // QR code with white quiet-zone padding, drawn from the source canvas
+  const qrSize = 280;
+  const qrX = (W - qrSize) / 2;
+  const qrY = 250;
+  const padding = 20;
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(qrX - padding, qrY - padding, qrSize + padding * 2, qrSize + padding * 2);
+  ctx.strokeStyle = "#E3E9E0";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(qrX - padding, qrY - padding, qrSize + padding * 2, qrSize + padding * 2);
+  ctx.drawImage(qrSourceEl, qrX, qrY, qrSize, qrSize);
+
+  // footer
+  ctx.fillStyle = "#9AA59C";
+  ctx.font = "12px Segoe UI, Arial, sans-serif";
+  ctx.fillText("Scan this code to check in", W / 2, qrY + qrSize + padding + 30);
+
+  return canvas;
 }
 
 function viewQR(studentId) {
@@ -464,69 +525,99 @@ function viewQR(studentId) {
   currentQRStudent = s;
   const holder = document.getElementById("qrModalCanvas");
   holder.innerHTML = "";
-  new QRCode(holder, { text: JSON.stringify({ studentId: s.studentId }), width: 220, height: 220 });
-  document.getElementById("qrModalLabel").textContent = `${s.firstName} ${s.lastName} (${s.studentId})`;
+  new QRCode(holder, { text: JSON.stringify({ studentId: s.studentId }), width: 280, height: 280, correctLevel: QRCode.CorrectLevel.M });
+
+  // qrcodejs renders asynchronously into canvas; small delay ensures it's ready
+  setTimeout(() => {
+    const qrEl = getQrCanvasOrImg(holder);
+    const cardCanvas = buildIdCardCanvas(s, qrEl);
+    currentIdCardDataUrl = cardCanvas.toDataURL("image/png");
+    document.getElementById("idCardPreview").src = currentIdCardDataUrl;
+  }, 80);
+
   openModal("qrModalOverlay");
 }
+
+let currentIdCardDataUrl = null;
+
 function downloadCurrentQR() {
-  if (!currentQRStudent) return;
-  const holder = document.getElementById("qrModalCanvas");
-  const url = getPaddedQRDataUrl(holder, 24);
+  if (!currentIdCardDataUrl || !currentQRStudent) return;
   const a = document.createElement("a");
-  a.href = url;
-  a.download = `QR_${currentQRStudent.studentId}.png`;
+  a.href = currentIdCardDataUrl;
+  a.download = `ID_${currentQRStudent.studentId}.png`;
   a.click();
 }
+
 function printCurrentQR() {
-  if (!currentQRStudent) return;
-  const holder = document.getElementById("qrModalCanvas");
-  const src = getPaddedQRDataUrl(holder, 24);
+  if (!currentIdCardDataUrl || !currentQRStudent) return;
   const w = window.open("", "_blank");
   w.document.write(`
-    <html><head><title>Print QR</title></head>
+    <html><head><title>Print ID Card</title></head>
     <body style="text-align:center;font-family:sans-serif;">
-      <h3>${currentQRStudent.firstName} ${currentQRStudent.lastName}</h3>
-      <p>${currentQRStudent.studentId}</p>
-      <img src="${src}" />
+      <img src="${currentIdCardDataUrl}" style="max-width:100%;" />
       <script>window.onload = () => { window.print(); }</script>
     </body></html>`);
   w.document.close();
 }
 
+async function shareCurrentQR() {
+  if (!currentIdCardDataUrl || !currentQRStudent) return;
+  try {
+    const res = await fetch(currentIdCardDataUrl);
+    const blob = await res.blob();
+    const file = new File([blob], `ID_${currentQRStudent.studentId}.png`, { type: "image/png" });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: `${currentQRStudent.firstName} ${currentQRStudent.lastName} — Student ID`,
+        text: `Student ID card for ${currentQRStudent.firstName} ${currentQRStudent.lastName} (${currentQRStudent.studentId})`
+      });
+      showToast("Shared successfully");
+    } else {
+      // Fallback: browsers without file-sharing support just get the download
+      downloadCurrentQR();
+      showToast("Sharing isn't supported on this browser — downloaded instead", true);
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") {
+      showToast("Share failed: " + err.message, true);
+    }
+  }
+}
+
 function printAllQR() {
   const container = document.getElementById("printAllContainer");
   container.innerHTML = "";
-  const cards = [];
+  const cardImages = [];
+
   DB.students.forEach(s => {
     const qrHolder = document.createElement("div");
     container.appendChild(qrHolder);
-    new QRCode(qrHolder, { text: JSON.stringify({ studentId: s.studentId }), width: 120, height: 120 });
-    cards.push({ student: s, holder: qrHolder });
+    new QRCode(qrHolder, { text: JSON.stringify({ studentId: s.studentId }), width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+    cardImages.push({ student: s, holder: qrHolder });
   });
 
   setTimeout(() => {
-    const cardsHtml = cards.map(({ student, holder }) => {
-      const src = getPaddedQRDataUrl(holder, 16);
-      return `<div class="print-card">
-        <img src="${src}" />
-        <p><strong>${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</strong></p>
-        <p>${escapeHtml(student.studentId)}</p>
-      </div>`;
+    const cardsHtml = cardImages.map(({ student, holder }) => {
+      const qrEl = getQrCanvasOrImg(holder);
+      const cardCanvas = buildIdCardCanvas(student, qrEl);
+      const src = cardCanvas.toDataURL("image/png");
+      return `<div class="print-card"><img src="${src}" style="width:100%;max-width:240px;" /></div>`;
     }).join("");
 
     const w = window.open("", "_blank");
-    w.document.write(`<html><head><title>Print All QR Codes</title>
+    w.document.write(`<html><head><title>Print All Student ID Cards</title>
       <style>
         body { font-family: sans-serif; }
-        .print-sheet { display:grid; grid-template-columns: repeat(3,1fr); gap: 24px; padding: 20px; }
-        .print-card { text-align:center; border:1px dashed #999; padding:12px; border-radius:8px; }
-        .print-card img { width: 120px; height: 120px; }
+        .print-sheet { display:grid; grid-template-columns: repeat(2,1fr); gap: 16px; padding: 16px; }
+        .print-card { text-align:center; }
       </style></head><body>
       <div class="print-sheet">${cardsHtml}</div>
       <script>window.onload = () => window.print();</script>
       </body></html>`);
     w.document.close();
-  }, 300);
+  }, 400);
 }
 
 /* ===================== CSV IMPORT ===================== */
@@ -549,7 +640,7 @@ function bindCsvImport() {
         lastName: obj["lastname"] || obj["last name"],
         email: obj["email"] || "",
         phone: obj["phone"] || "",
-        level: obj["level"] || ""
+        group: obj["group"] || obj["level"] || ""
       };
       if (!payload.studentId) continue;
       try {
@@ -634,20 +725,36 @@ async function handleScannedId(studentId) {
 
   try {
     const res = await apiPost("addAttendance", { studentId });
+
     if (res.success) {
+      const d = res.data;
       resultCard.innerHTML = `
         <div class="scan-result-success">
           <div class="scan-result-icon">✅</div>
           <h3>Attendance Recorded Successfully</h3>
-          <p><strong>${escapeHtml(res.data.studentName)}</strong></p>
-          <p class="muted">${escapeHtml(res.data.courseName || "")} • ${escapeHtml(res.data.time)}</p>
+          <div class="scan-identity">
+            <div class="scan-avatar">${escapeHtml(getInitials(d.studentName))}</div>
+            <div class="scan-identity-text">
+              <div class="scan-fullname">${escapeHtml(d.studentName)}</div>
+              <div class="scan-group-badge">${escapeHtml(d.studentGroup || "No Group")}</div>
+            </div>
+          </div>
+          <p class="muted">${escapeHtml(d.courseName || "")} • ${escapeHtml(d.time)}</p>
         </div>`;
     } else if (res.code === "ALREADY_CHECKED_IN") {
+      const d = res.data || {};
       resultCard.innerHTML = `
         <div class="scan-result-error">
           <div class="scan-result-icon">⚠️</div>
           <h3>Already Checked In</h3>
-          <p>${escapeHtml(res.message)}</p>
+          <div class="scan-identity">
+            <div class="scan-avatar">${escapeHtml(getInitials(d.studentName || studentId))}</div>
+            <div class="scan-identity-text">
+              <div class="scan-fullname">${escapeHtml(d.studentName || studentId)}</div>
+              <div class="scan-group-badge">${escapeHtml(d.studentGroup || "No Group")}</div>
+            </div>
+          </div>
+          <p class="muted">${escapeHtml(res.message)}</p>
         </div>`;
     } else {
       resultCard.innerHTML = `
@@ -663,16 +770,25 @@ async function handleScannedId(studentId) {
   }
 }
 
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = String(name).trim().split(/\s+/);
+  return parts.slice(0, 2).map(p => p[0]?.toUpperCase() || "").join("");
+}
+
 function renderRecentAttendance() {
   const tbody = document.querySelector("#recentAttendanceTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
   const todayStr = formatDate(new Date());
+  const groupMap = {};
+  DB.students.forEach(s => groupMap[s.studentId] = s.group);
+
   DB.attendance.filter(a => a.date === todayStr)
     .sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""))
     .forEach(a => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${escapeHtml(a.studentId)}</td><td>${escapeHtml(a.studentName)}</td><td>${escapeHtml(a.courseName)}</td><td>${escapeHtml(a.time)}</td>`;
+      tr.innerHTML = `<td>${escapeHtml(a.studentId)}</td><td>${escapeHtml(a.studentName)}</td><td>${escapeHtml(groupMap[a.studentId] || "")}</td><td>${escapeHtml(a.courseName)}</td><td>${escapeHtml(a.time)}</td>`;
       tbody.appendChild(tr);
     });
 }
@@ -681,21 +797,21 @@ function renderRecentAttendance() {
 function populateReportFilters() {
   const courseSel = document.getElementById("reportCourse");
   const studentSel = document.getElementById("reportStudent");
-  const levelSel = document.getElementById("reportLevel");
+  const groupSel = document.getElementById("reportGroup");
 
   courseSel.innerHTML = '<option value="">All Courses</option>' +
     DB.courses.map(c => `<option value="${escapeAttr(c.courseId)}">${escapeHtml(c.courseName)}</option>`).join("");
   studentSel.innerHTML = '<option value="">All Students</option>' +
     DB.students.map(s => `<option value="${escapeAttr(s.studentId)}">${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)}</option>`).join("");
-  const levels = [...new Set(DB.students.map(s => s.level).filter(Boolean))];
-  levelSel.innerHTML = '<option value="">All Levels</option>' + levels.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join("");
+  const groups = [...new Set(DB.students.map(s => s.group).filter(Boolean))];
+  groupSel.innerHTML = '<option value="">All Groups</option>' + groups.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join("");
 }
 
 let lastReportRows = [];
 function runReport() {
   const courseId = document.getElementById("reportCourse").value;
   const studentId = document.getElementById("reportStudent").value;
-  const level = document.getElementById("reportLevel").value;
+  const group = document.getElementById("reportGroup").value;
   let start = document.getElementById("reportStart").value;
   let end = document.getElementById("reportEnd").value;
   const type = document.getElementById("reportType").value;
@@ -711,13 +827,13 @@ function runReport() {
     start = formatDate(monthAgo); end = formatDate(today);
   }
 
-  const studentLevelMap = {};
-  DB.students.forEach(s => studentLevelMap[s.studentId] = s.level);
+  const studentGroupMap = {};
+  DB.students.forEach(s => studentGroupMap[s.studentId] = s.group);
 
   const rows = DB.attendance.filter(a => {
     if (courseId && a.courseId !== courseId) return false;
     if (studentId && a.studentId !== studentId) return false;
-    if (level && studentLevelMap[a.studentId] !== level) return false;
+    if (group && studentGroupMap[a.studentId] !== group) return false;
     if (start && a.date < start) return false;
     if (end && a.date > end) return false;
     return true;
