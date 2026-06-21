@@ -711,7 +711,7 @@ function updateSessionBadge() {
   if (!badge) return;
   const groupSel  = document.getElementById("scannerGroupFilter");
   const groupVal  = groupSel ? (groupSel.value || "All Groups") : "All Groups";
-  const icons     = { Theory: "🌅", TP1: "①", TP2: "②", TP3: "③" };
+  const icons     = { Theory: "📖", TP1: "🔬", TP2: "🔬", TP3: "🔬" };
   badge.textContent = `${icons[currentClassType] || "📋"} ${currentClassType}  ·  👥 ${groupVal}`;
 }
 
