@@ -181,7 +181,7 @@ async function refreshAttendanceOnly() {
     DB.attendance = res.data || [];
     renderRecentAttendance();
     const todayStr = formatDate(new Date());
-    document.getElementById("statToday").textContent = DB.attendance.filter(a => a.date === todayStr).length;
+    setText("statToday", DB.attendance.filter(a => a.date === todayStr).length);
   } catch (err) { console.warn("Attendance refresh failed:", err.message); }
 }
 async function forceReloadData() {
@@ -205,16 +205,16 @@ async function forceReloadData() {
 
 /* ===================== DASHBOARD ===================== */
 function renderDashboard() {
-  document.getElementById("statStudents").textContent = DB.students.length;
+  setText("statStudents", DB.students.length);
   const todayStr = formatDate(new Date());
-  document.getElementById("statToday").textContent = DB.attendance.filter(a => a.date === todayStr).length;
+  setText("statToday", DB.attendance.filter(a => a.date === todayStr).length);
   const activeCourse = DB.courses.find(c => c.status === "Ongoing");
-  document.getElementById("statActiveCourse").textContent = activeCourse ? activeCourse.courseName : "None";
+  setText("statActiveCourse", activeCourse ? activeCourse.courseName : "None");
 
   // Sessions completed = past weekdays in course range
   const allDays = activeCourse ? getCourseDays(activeCourse) : [];
   const passedDays = allDays.filter(d => d < todayStr);
-  document.getElementById("statPassedSessions").textContent = passedDays.length;
+  setText("statPassedSessions", passedDays.length);
 
   renderDashboardAbsences(activeCourse, passedDays);
   renderTrendChart();
@@ -224,16 +224,16 @@ function renderDashboardAbsences(activeCourse, passedDays) {
   const absenceRow = document.getElementById("dashboardAbsenceRow");
   const absentCard = document.getElementById("dashboardAbsentCard");
   if (!activeCourse || !passedDays.length) {
-    absenceRow.style.display = "none";
-    absentCard.style.display = "none";
+    if (absenceRow) absenceRow.style.display = "none";
+    if (absentCard) absentCard.style.display = "none";
     return;
   }
   const yesterdayDate = new Date();
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayStr = formatDate(yesterdayDate);
   if (!passedDays.includes(yesterdayStr)) {
-    absenceRow.style.display = "none";
-    absentCard.style.display = "none";
+    if (absenceRow) absenceRow.style.display = "none";
+    if (absentCard) absentCard.style.display = "none";
     return;
   }
   const attendedYesterday = new Set(
@@ -241,11 +241,13 @@ function renderDashboardAbsences(activeCourse, passedDays) {
       .map(a => a.studentId)
   );
   const absentStudents = DB.students.filter(s => !attendedYesterday.has(s.studentId));
-  document.getElementById("statYesterdayAbsent").textContent = absentStudents.length;
-  absenceRow.style.display = "";
-  if (!absentStudents.length) { absentCard.style.display = "none"; return; }
-  absentCard.style.display = "";
-  document.getElementById("dashboardYesterdayLabel").textContent = yesterdayStr;
+  setText("statYesterdayAbsent", absentStudents.length);
+  const absenceRow = document.getElementById("dashboardAbsenceRow");
+  if (absenceRow) absenceRow.style.display = "";
+  if (!absentStudents.length) { const c = document.getElementById("dashboardAbsentCard"); if(c) c.style.display = "none"; return; }
+  const absentCard = document.getElementById("dashboardAbsentCard");
+  if (absentCard) absentCard.style.display = "";
+  setText("dashboardYesterdayLabel", yesterdayStr);
   document.querySelector("#dashboardAbsentTable tbody").innerHTML =
     absentStudents.map(s => `<tr>
       <td>${escapeHtml(s.studentId)}</td>
@@ -340,9 +342,10 @@ function updateCourseDurationDisplay() {
   const end   = document.getElementById("courseEnd").value;
   const el    = document.getElementById("courseDurationDisplay");
   if (start && end) {
-    const tempCourse = { startDate: start, endDate: end };
-    const days = getCourseDays(tempCourse);
-    el.value = `${days.length} working day${days.length !== 1 ? "s" : ""} (Mon–Fri, ${start} → ${end})`;
+    const s = new Date(start + "T00:00:00");
+    const e = new Date(end   + "T00:00:00");
+    const days = Math.round((e - s) / 86400000) + 1;
+    el.value = days > 0 ? `${days} day${days !== 1 ? "s" : ""} (${start} → ${end})` : "End date must be after start date";
   } else {
     el.value = "Select start and end dates";
   }
@@ -1010,19 +1013,14 @@ function getCourseDays(course) {
   if (!course || !course.startDate) return [];
   const startStr = normalizeDate(course.startDate);
   const endStr   = course.endDate ? normalizeDate(course.endDate) : null;
-  if (!startStr) return [];
+  if (!startStr || !endStr) return [];
   const days = [];
   let cur = new Date(startStr + "T00:00:00");
-  const endDate = endStr ? new Date(endStr + "T00:00:00") : null;
-  let iterations = 0;
-  while (iterations < 400) {
-    iterations++;
-    const dow = cur.getDay();
-    if (dow !== 0 && dow !== 6) {
-      const ds = formatDate(cur);
-      if (endDate && cur > endDate) break;
-      days.push(ds);
-    }
+  const endDate = new Date(endStr + "T00:00:00");
+  // Include every calendar day from start to end (no weekend filtering —
+  // the course dates themselves define the schedule)
+  while (cur <= endDate && days.length < 400) {
+    days.push(formatDate(cur));
     cur.setDate(cur.getDate() + 1);
   }
   return days;
@@ -1059,3 +1057,17 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 }
 function escapeAttr(str) { return escapeHtml(str).replace(/"/g, "&quot;"); }
+
+// Null-safe element text setter — prevents "Cannot set properties of null" crashes
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function setHtml(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = val;
+}
+function setStyle(id, prop, val) {
+  const el = document.getElementById(id);
+  if (el) el.style[prop] = val;
+}
