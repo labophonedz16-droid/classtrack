@@ -242,10 +242,8 @@ function renderDashboardAbsences(activeCourse, passedDays) {
   );
   const absentStudents = DB.students.filter(s => !attendedYesterday.has(s.studentId));
   setText("statYesterdayAbsent", absentStudents.length);
-  const absenceRow = document.getElementById("dashboardAbsenceRow");
   if (absenceRow) absenceRow.style.display = "";
-  if (!absentStudents.length) { const c = document.getElementById("dashboardAbsentCard"); if(c) c.style.display = "none"; return; }
-  const absentCard = document.getElementById("dashboardAbsentCard");
+  if (!absentStudents.length) { if (absentCard) absentCard.style.display = "none"; return; }
   if (absentCard) absentCard.style.display = "";
   setText("dashboardYesterdayLabel", yesterdayStr);
   document.querySelector("#dashboardAbsentTable tbody").innerHTML =
