@@ -6,16 +6,12 @@
 <title>QR Attendance System</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%2369C11F%22/></svg>" />
 <link rel="stylesheet" href="styles.css" />
-<!-- QR Code generator -->
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<!-- QR Code scanner -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<!-- Charts -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body data-theme="light">
 
-<!-- TOP BAR -->
 <header class="topbar">
   <div class="topbar-left">
     <button id="sidebarToggle" class="icon-btn" aria-label="Toggle menu">☰</button>
@@ -31,26 +27,23 @@
 </header>
 
 <div class="app-shell">
-  <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
     <a href="#dashboard" class="nav-item active" data-page="dashboard"><span class="nav-icon">📊</span> Dashboard</a>
-    <a href="#courses" class="nav-item" data-page="courses"><span class="nav-icon">📚</span> Courses</a>
-    <a href="#students" class="nav-item" data-page="students"><span class="nav-icon">🧑‍🎓</span> Students</a>
-    <a href="#scanner" class="nav-item" data-page="scanner"><span class="nav-icon">📷</span> Scanner</a>
-    <a href="#reports" class="nav-item" data-page="reports"><span class="nav-icon">📈</span> Reports</a>
-    <a href="#settings" class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Settings</a>
+    <a href="#course"    class="nav-item"         data-page="course"><span class="nav-icon">📚</span> Course</a>
+    <a href="#students"  class="nav-item"         data-page="students"><span class="nav-icon">🧑‍🎓</span> Students</a>
+    <a href="#scanner"   class="nav-item"         data-page="scanner"><span class="nav-icon">📷</span> Scanner</a>
+    <a href="#reports"   class="nav-item"         data-page="reports"><span class="nav-icon">📈</span> Reports</a>
+    <a href="#settings"  class="nav-item"         data-page="settings"><span class="nav-icon">⚙️</span> Settings</a>
   </nav>
 
   <main class="content">
-
-    <!-- TOAST -->
     <div id="toastContainer" class="toast-container"></div>
 
     <!-- ===================== DASHBOARD ===================== -->
     <section id="page-dashboard" class="page active">
       <div class="page-head">
         <h1>Dashboard</h1>
-        <p class="muted">Overview of your school attendance system</p>
+        <p class="muted">Overview of your attendance system</p>
       </div>
       <div class="stat-grid">
         <div class="stat-card">
@@ -58,23 +51,19 @@
           <div><div class="stat-value" id="statStudents">0</div><div class="stat-label">Total Students</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--secondary)">📚</div>
-          <div><div class="stat-value" id="statCourses">0</div><div class="stat-label">Total Courses</div></div>
-        </div>
-        <div class="stat-card">
           <div class="stat-icon" style="background:var(--accent)">✅</div>
           <div><div class="stat-value" id="statToday">0</div><div class="stat-label">Attendance Today</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon" style="background:#3b82f6">🎯</div>
-          <div><div class="stat-value" id="statActiveCourse">-</div><div class="stat-label">Active Course</div></div>
+          <div><div class="stat-value" id="statActiveCourse" style="font-size:16px;line-height:1.3">-</div><div class="stat-label">Active Course</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#f59e0b">📅</div>
+          <div><div class="stat-value" id="statPassedSessions">0</div><div class="stat-label">Sessions Completed</div></div>
         </div>
       </div>
-      <div class="stat-grid" id="dashboardSessionsGrid" style="display:none">
-        <div class="stat-card stat-card-warn">
-          <div class="stat-icon" style="background:#f59e0b">📅</div>
-          <div><div class="stat-value" id="statPassedSessions">0</div><div class="stat-label">Past Course Sessions</div></div>
-        </div>
+      <div class="stat-grid" id="dashboardAbsenceRow" style="display:none">
         <div class="stat-card stat-card-danger">
           <div class="stat-icon" style="background:#ef4444">🚫</div>
           <div><div class="stat-value" id="statYesterdayAbsent">0</div><div class="stat-label">Absent Yesterday</div></div>
@@ -87,7 +76,7 @@
         </div>
         <div class="table-wrap">
           <table class="data-table" id="dashboardAbsentTable">
-            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th><th>Course</th></tr></thead>
+            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -98,24 +87,38 @@
       </div>
     </section>
 
-    <!-- ===================== COURSES ===================== -->
-    <section id="page-courses" class="page">
-      <div class="page-head row-between">
-        <div>
-          <h1>Courses</h1>
-          <p class="muted">Manage school courses</p>
-        </div>
-        <button class="btn btn-primary" onclick="openCourseModal()">+ New Course</button>
+    <!-- ===================== COURSE ===================== -->
+    <section id="page-course" class="page">
+      <div class="page-head">
+        <h1>Course</h1>
+        <p class="muted">Manage the active course</p>
       </div>
-      <div class="card">
-        <div class="table-wrap">
-          <table class="data-table" id="coursesTable">
-            <thead><tr>
-              <th>Course</th><th>Subject</th><th>Group</th><th>Teacher</th>
-              <th>Duration</th><th>Start</th><th>End</th><th>Status</th><th>Actions</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
+
+      <!-- No course state -->
+      <div id="courseNoneCard" class="card" style="display:none;text-align:center;padding:48px 24px">
+        <div style="font-size:48px;margin-bottom:16px">📚</div>
+        <h2 style="margin:0 0 8px">No Active Course</h2>
+        <p class="muted" style="margin-bottom:24px">Create a course to start tracking attendance</p>
+        <button class="btn btn-primary" onclick="openCourseModal()">+ Create Course</button>
+      </div>
+
+      <!-- Active / Ended course card -->
+      <div id="courseActiveCard" style="display:none">
+        <div class="card course-info-card" id="courseInfoDisplay">
+          <!-- filled by renderCourseCard() -->
+        </div>
+        <!-- Ended banner (shown when course.endDate < today) -->
+        <div class="card course-ended-banner" id="courseEndedBanner" style="display:none">
+          <div class="ended-banner-content">
+            <div>
+              <h2 style="margin:0 0 4px;color:#ef4444">📋 Course Ended</h2>
+              <p class="muted" style="margin:0">This course has finished. Download your data or start a new course.</p>
+            </div>
+            <div class="ended-banner-actions">
+              <button class="btn btn-outline" onclick="downloadCourseData()">⬇ Download All Data</button>
+              <button class="btn btn-danger" onclick="confirmNewCourse()">🗑 Start New Course</button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -128,7 +131,7 @@
           <p class="muted">Manage student records and QR codes</p>
         </div>
         <div class="btn-group">
-          <button class="btn btn-outline" onclick="downloadExampleCSV()">⬇ Download Example CSV</button>
+          <button class="btn btn-outline" onclick="downloadExampleCSV()">⬇ Example CSV</button>
           <button class="btn btn-outline" onclick="document.getElementById('csvInput').click()">⬆ Import CSV</button>
           <input type="file" id="csvInput" accept=".csv" style="display:none" />
           <button class="btn btn-outline" onclick="printAllQR()">🖨 Print All QR</button>
@@ -157,12 +160,28 @@
         <h1>Attendance Scanner</h1>
         <p class="muted">Scan a student's QR code to check in</p>
       </div>
+
+      <!-- Group filter setup -->
+      <div class="card scanner-setup-card">
+        <div class="scanner-setup-row">
+          <div>
+            <label class="form-label-inline">📋 Session Group Filter</label>
+            <p class="muted" style="margin:2px 0 0">Only allow check-in from the selected group. Scans from other groups will be rejected.</p>
+          </div>
+          <div class="scanner-group-select-wrap">
+            <select id="scannerGroupFilter" class="scanner-group-select">
+              <option value="">🌐 All Groups (Morning / Full Class)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="scanner-layout">
         <div class="card scanner-card">
           <div id="qr-reader"></div>
           <div class="scanner-controls">
             <button class="btn btn-primary" id="startScanBtn">▶ Start Camera</button>
-            <button class="btn btn-outline" id="stopScanBtn" disabled>⏸ Stop Camera</button>
+            <button class="btn btn-danger" id="stopScanBtn" disabled>⏹ Stop Camera</button>
           </div>
           <div class="manual-entry">
             <input type="text" id="manualStudentId" placeholder="Or enter Student ID manually" />
@@ -173,11 +192,12 @@
           <div class="scan-result-placeholder">Scan result will appear here</div>
         </div>
       </div>
+
       <div class="card">
         <h3>Recent Check-ins (Today)</h3>
         <div class="table-wrap">
           <table class="data-table" id="recentAttendanceTable">
-            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th><th>Course</th><th>Time</th></tr></thead>
+            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th><th>Date</th><th>Time</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -188,36 +208,32 @@
     <section id="page-reports" class="page">
       <div class="page-head">
         <h1>Reports</h1>
-        <p class="muted">Generate and export attendance reports</p>
+        <p class="muted">Attendance matrix and logs</p>
       </div>
 
-      <!-- Attendance Matrix -->
+      <!-- Attendance Matrix — auto-loads current course, no filters -->
       <div class="card">
         <div class="card-head-row">
           <h3>📊 Attendance Matrix</h3>
-          <span class="muted">Students vs Course Days</span>
-        </div>
-        <div class="filters-row wrap" style="margin-bottom:12px">
-          <select id="matrixCourse"><option value="">Select Course...</option></select>
-          <select id="matrixGroup"><option value="">All Groups</option></select>
-          <button class="btn btn-primary" onclick="runAttendanceMatrix()">Generate Matrix</button>
-          <button class="btn btn-outline" onclick="exportMatrixCSV()">Export CSV</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-primary btn-sm" onclick="runAttendanceMatrix()">🔄 Refresh</button>
+            <button class="btn btn-outline btn-sm" onclick="exportMatrixCSV()">Export CSV</button>
+          </div>
         </div>
         <div class="matrix-legend">
           <span class="legend-item"><span class="matrix-cell cell-present">✓</span> Present</span>
-          <span class="legend-item"><span class="matrix-cell cell-absent">✗</span> Absent (past)</span>
-          <span class="legend-item"><span class="matrix-cell cell-future">–</span> Not yet</span>
+          <span class="legend-item"><span class="matrix-cell cell-absent">✗</span> Absent</span>
+          <span class="legend-item"><span class="matrix-cell cell-future">–</span> Upcoming</span>
         </div>
         <div class="table-wrap" id="matrixWrap">
-          <p class="muted" style="padding:24px;text-align:center">Select a course and click Generate Matrix</p>
+          <p class="muted" style="padding:24px;text-align:center">Loading matrix…</p>
         </div>
       </div>
 
-      <!-- Classic Report -->
+      <!-- Classic log -->
       <div class="card">
         <h3>📋 Attendance Log</h3>
         <div class="filters-row wrap">
-          <select id="reportCourse"><option value="">All Courses</option></select>
           <select id="reportStudent"><option value="">All Students</option></select>
           <select id="reportGroup"><option value="">All Groups</option></select>
           <input type="date" id="reportStart" />
@@ -234,7 +250,7 @@
         </div>
         <div class="table-wrap">
           <table class="data-table" id="reportTable">
-            <thead><tr><th>Date</th><th>Time</th><th>Student ID</th><th>Name</th><th>Course</th></tr></thead>
+            <thead><tr><th>Date</th><th>Time</th><th>Student ID</th><th>Name</th><th>Group</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -271,6 +287,12 @@
         <button class="btn btn-outline" onclick="testConnection()">Test Connection</button>
         <span id="settingsSaveMsg" class="muted"></span>
       </div>
+      <div class="card settings-card">
+        <h3>Data Sync</h3>
+        <p class="muted" style="margin-bottom:12px">Force a full reload of all data from Google Sheets.</p>
+        <button class="btn btn-secondary" id="reloadDataBtn" onclick="forceReloadData()">🔄 Reload All Data from Sheets</button>
+        <span id="reloadDataMsg" class="muted" style="margin-left:12px"></span>
+      </div>
     </section>
 
   </main>
@@ -278,21 +300,25 @@
 
 <!-- ===================== MODALS ===================== -->
 
-<!-- Course Modal -->
+<!-- Course Modal (create/edit) -->
 <div class="modal-overlay" id="courseModalOverlay">
   <div class="modal">
-    <div class="modal-head"><h3 id="courseModalTitle">New Course</h3><button class="icon-btn" onclick="closeModal('courseModalOverlay')">✕</button></div>
+    <div class="modal-head">
+      <h3 id="courseModalTitle">New Course</h3>
+      <button class="icon-btn" onclick="closeModal('courseModalOverlay')">✕</button>
+    </div>
     <div class="modal-body">
       <input type="hidden" id="courseId" />
       <div class="form-grid">
-        <div class="form-field"><label>Course Name</label><input type="text" id="courseName" /></div>
-        <div class="form-field"><label>Subject</label><input type="text" id="courseSubject" /></div>
-        <div class="form-field"><label>Group</label><input type="text" id="courseGroup" list="groupsDatalist" placeholder="e.g. Group A" /></div>
-        <div class="form-field"><label>Teacher</label><input type="text" id="courseTeacher" /></div>
-        <div class="form-field"><label>Duration (days)</label><input type="number" id="courseDuration" /></div>
+        <div class="form-field full"><label>Course Name</label><input type="text" id="courseName" /></div>
+        <div class="form-field full"><label>Subject</label><input type="text" id="courseSubject" /></div>
         <div class="form-field"><label>Start Date</label><input type="date" id="courseStart" /></div>
         <div class="form-field"><label>End Date</label><input type="date" id="courseEnd" /></div>
-        <div class="form-field">
+        <div class="form-field full">
+          <label>Duration (auto-calculated from dates)</label>
+          <input type="text" id="courseDurationDisplay" readonly placeholder="Select start and end dates" style="background:var(--bg);cursor:default;color:var(--text-muted)" />
+        </div>
+        <div class="form-field full">
           <label>Status</label>
           <select id="courseStatus">
             <option value="Draft">Draft</option>
@@ -309,10 +335,31 @@
   </div>
 </div>
 
+<!-- Confirm New Course (reset database) -->
+<div class="modal-overlay" id="newCourseModalOverlay">
+  <div class="modal modal-sm">
+    <div class="modal-head">
+      <h3>⚠️ Start New Course</h3>
+      <button class="icon-btn" onclick="closeModal('newCourseModalOverlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px">This will <strong>permanently delete</strong> all current students, attendance records, and course data from the Google Sheet.</p>
+      <p style="margin:0;color:#ef4444">Make sure you have downloaded your data before proceeding.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('newCourseModalOverlay')">Cancel</button>
+      <button class="btn btn-danger" onclick="resetAndStartNew()">🗑 Yes, Clear Everything</button>
+    </div>
+  </div>
+</div>
+
 <!-- Student Modal -->
 <div class="modal-overlay" id="studentModalOverlay">
   <div class="modal">
-    <div class="modal-head"><h3 id="studentModalTitle">Add Student</h3><button class="icon-btn" onclick="closeModal('studentModalOverlay')">✕</button></div>
+    <div class="modal-head">
+      <h3 id="studentModalTitle">Add Student</h3>
+      <button class="icon-btn" onclick="closeModal('studentModalOverlay')">✕</button>
+    </div>
     <div class="modal-body">
       <input type="hidden" id="studentEditingId" />
       <div class="form-grid">
@@ -335,7 +382,10 @@
 <!-- QR View Modal -->
 <div class="modal-overlay" id="qrModalOverlay">
   <div class="modal modal-sm">
-    <div class="modal-head"><h3>Student ID Card</h3><button class="icon-btn" onclick="closeModal('qrModalOverlay')">✕</button></div>
+    <div class="modal-head">
+      <h3>Student ID Card</h3>
+      <button class="icon-btn" onclick="closeModal('qrModalOverlay')">✕</button>
+    </div>
     <div class="modal-body" style="text-align:center">
       <div id="qrModalCanvas" style="display:none"></div>
       <img id="idCardPreview" alt="Student ID Card" style="max-width:100%;border-radius:12px;box-shadow:var(--shadow);" />
@@ -348,9 +398,7 @@
   </div>
 </div>
 
-<!-- Hidden container used to render QR codes for "Print All" -->
 <div id="printAllContainer" style="display:none"></div>
-
 <script src="app.js"></script>
 </body>
 </html>

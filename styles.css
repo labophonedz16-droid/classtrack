@@ -330,3 +330,47 @@ td.matrix-cell { text-align: center; }
 .stat-card-danger { border-left: 4px solid #ef4444; }
 .card-head-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .card-head-row h3 { margin: 0; }
+
+/* ===================== COURSE PAGE ===================== */
+.course-info-card { padding: 24px; }
+.course-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
+}
+.course-stats-row {
+  display: flex; gap: 0; flex-wrap: wrap;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.course-stat {
+  flex: 1; min-width: 100px; padding: 14px 16px;
+  border-right: 1px solid var(--border); text-align: center;
+}
+.course-stat:last-child { border-right: none; }
+.course-stat-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing:.04em; color: var(--text-muted); margin-bottom: 4px; }
+.course-stat-value { display: block; font-size: 20px; font-weight: 800; }
+
+.course-ended-banner { border: 1px solid #ef4444 !important; background: rgba(239,68,68,0.06) !important; }
+.ended-banner-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.ended-banner-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ===================== SCANNER SETUP ===================== */
+.scanner-setup-card { padding: 16px 20px; margin-bottom: 16px; }
+.scanner-setup-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.scanner-group-select-wrap { min-width: 260px; }
+.scanner-group-select { width: 100%; font-size: 14px; font-weight: 600; }
+.form-label-inline { font-size: 14px; font-weight: 700; margin: 0; }
+
+/* ===================== SCAN REJECT ===================== */
+.scan-result-reject {
+  text-align: center; padding: 20px; border-radius: 12px; width: 100%;
+  animation: popIn .3s ease;
+  background: rgba(124,58,237,0.09); border: 1px solid #7c3aed;
+}
+.scan-group-badge-reject {
+  background: rgba(124,58,237,.18); color: #7c3aed;
+}
+
+/* ===================== MATRIX TWEAKS ===================== */
+.matrix-day-label { font-size: 10px; font-weight: 600; display: block; margin-top: 2px; }
+.matrix-day-hdr { font-size: 16px; padding: 6px 6px 4px; text-align: center; min-width: 50px; line-height: 1.2; }
+.matrix-id-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; }
