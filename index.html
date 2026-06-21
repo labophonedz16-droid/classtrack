@@ -161,18 +161,28 @@
         <p class="muted">Scan a student's QR code to check in</p>
       </div>
 
-      <!-- Group filter setup -->
+      <!-- Session setup -->
       <div class="card scanner-setup-card">
-        <div class="scanner-setup-row">
-          <div>
-            <label class="form-label-inline">📋 Session Group Filter</label>
-            <p class="muted" style="margin:2px 0 0">Only allow check-in from the selected group. Scans from other groups will be rejected.</p>
+        <div class="scanner-setup-grid">
+          <div class="setup-block">
+            <label class="setup-label">📚 Class Type</label>
+            <div class="class-type-btns" id="classTypeBtns">
+              <button class="class-btn active" data-type="Theory" onclick="selectClassType('Theory')">🌅 Theory</button>
+              <button class="class-btn" data-type="TP1" onclick="selectClassType('TP1')">① TP 1</button>
+              <button class="class-btn" data-type="TP2" onclick="selectClassType('TP2')">② TP 2</button>
+              <button class="class-btn" data-type="TP3" onclick="selectClassType('TP3')">③ TP 3</button>
+            </div>
           </div>
-          <div class="scanner-group-select-wrap">
-            <select id="scannerGroupFilter" class="scanner-group-select">
-              <option value="">🌐 All Groups (Morning / Full Class)</option>
+          <div class="setup-block">
+            <label class="setup-label">👥 Group</label>
+            <select id="scannerGroupFilter" class="scanner-group-select" onchange="onGroupFilterChange()">
+              <option value="">🌐 All Groups</option>
             </select>
+            <p class="muted setup-hint" id="groupFilterHint">Theory class — all groups attend</p>
           </div>
+        </div>
+        <div class="session-badge-row">
+          <span class="session-badge" id="sessionBadge">🌅 Theory &nbsp;·&nbsp; 🌐 All Groups</span>
         </div>
       </div>
 
@@ -197,7 +207,7 @@
         <h3>Recent Check-ins (Today)</h3>
         <div class="table-wrap">
           <table class="data-table" id="recentAttendanceTable">
-            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th><th>Date</th><th>Time</th></tr></thead>
+            <thead><tr><th>Student ID</th><th>Name</th><th>Group</th><th>Class</th><th>Date</th><th>Time</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -363,7 +373,13 @@
     <div class="modal-body">
       <input type="hidden" id="studentEditingId" />
       <div class="form-grid">
-        <div class="form-field"><label>Student ID</label><input type="text" id="studentId" placeholder="STD001" /></div>
+        <div class="form-field">
+            <label>Student ID</label>
+            <div class="input-with-btn">
+              <input type="text" id="studentId" placeholder="0507-0001" />
+              <button class="btn btn-outline btn-icon" type="button" onclick="generateStudentId()" title="Generate ID from course start date">🎲</button>
+            </div>
+          </div>
         <div class="form-field"><label>First Name</label><input type="text" id="studentFirstName" /></div>
         <div class="form-field"><label>Last Name</label><input type="text" id="studentLastName" /></div>
         <div class="form-field"><label>Email</label><input type="email" id="studentEmail" /></div>

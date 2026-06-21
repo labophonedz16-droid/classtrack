@@ -374,3 +374,43 @@ td.matrix-cell { text-align: center; }
 .matrix-day-label { font-size: 10px; font-weight: 600; display: block; margin-top: 2px; }
 .matrix-day-hdr { font-size: 16px; padding: 6px 6px 4px; text-align: center; min-width: 50px; line-height: 1.2; }
 .matrix-id-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+/* ===================== SCANNER CLASS TYPE ===================== */
+.scanner-setup-grid {
+  display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;
+}
+.setup-block { flex: 1; min-width: 200px; }
+.setup-label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin-bottom: 8px; }
+.setup-hint  { font-size: 12px; margin: 6px 0 0; min-height: 16px; }
+
+.class-type-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.class-btn {
+  padding: 8px 14px; border-radius: 8px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text); cursor: pointer;
+  font-size: 13px; font-weight: 600; transition: all .15s;
+  white-space: nowrap;
+}
+.class-btn:hover  { border-color: var(--primary); color: var(--primary); }
+.class-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.session-badge-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.session-badge {
+  display: inline-block; padding: 6px 14px; border-radius: 20px;
+  background: var(--primary); color: #fff; font-size: 13px; font-weight: 700;
+  letter-spacing: .02em;
+}
+
+/* ===================== SESSION TAGS ===================== */
+.session-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 5px;
+  font-size: 12px; font-weight: 700;
+}
+.session-tag-Theory { background: rgba(59,130,246,.15); color: #2563eb; }
+.session-tag-TP1    { background: rgba(16,185,129,.15); color: #059669; }
+.session-tag-TP2    { background: rgba(245,158,11,.15); color: #d97706; }
+.session-tag-TP3    { background: rgba(139,92,246,.15); color: #7c3aed; }
+
+/* ===================== INPUT WITH BUTTON ===================== */
+.input-with-btn { display: flex; gap: 6px; align-items: center; }
+.input-with-btn input { flex: 1; }
+.btn-icon { padding: 8px 10px; font-size: 16px; line-height: 1; flex-shrink: 0; }

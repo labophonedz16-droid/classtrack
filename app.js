@@ -517,6 +517,36 @@ function populateGroupFilters() {
   if (datalist) datalist.innerHTML = groups.map(g => `<option value="${escapeAttr(g)}"></option>`).join("");
 }
 
+function generateStudentId() {
+  // Format: DDMM-XXXX where DDMM is from course start date
+  const course = DB.courses[0] || null;
+  let prefix = "0000";
+  if (course && course.startDate) {
+    const d = new Date(normalizeDate(course.startDate) + "T00:00:00");
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      prefix = dd + mm;
+    }
+  }
+  // Find the highest existing sequence number for this prefix
+  const pattern = new RegExp("^" + prefix + "-(\\d+)$");
+  let maxSeq = 0;
+  DB.students.forEach(s => {
+    const m = String(s.studentId).match(pattern);
+    if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+  });
+  // Also check what's typed in the form already
+  const current = document.getElementById("studentId")?.value || "";
+  const cm = current.match(pattern);
+  if (cm) maxSeq = Math.max(maxSeq, parseInt(cm[1], 10));
+
+  const next = String(maxSeq + 1).padStart(4, "0");
+  const newId = `${prefix}-${next}`;
+  const input = document.getElementById("studentId");
+  if (input) { input.value = newId; input.focus(); }
+}
+
 /* ===================== QR / ID CARD ===================== */
 function getQrCanvasOrImg(containerEl) {
   return containerEl.querySelector("canvas") || containerEl.querySelector("img");
@@ -654,12 +684,45 @@ function parseCSV(text) {
 }
 
 /* ===================== SCANNER ===================== */
+/* ===================== SCANNER SETUP ===================== */
+let currentClassType = "Theory"; // Theory | TP1 | TP2 | TP3
+
+function selectClassType(type) {
+  currentClassType = type;
+  // Update button states
+  document.querySelectorAll(".class-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.type === type);
+  });
+  const groupSel  = document.getElementById("scannerGroupFilter");
+  const hint      = document.getElementById("groupFilterHint");
+  const isTheory  = type === "Theory";
+  if (groupSel) {
+    groupSel.disabled = isTheory;
+    if (isTheory) { groupSel.value = ""; }
+  }
+  if (hint) hint.textContent = isTheory ? "Theory class — all groups attend" : "Select the group for this TP session";
+  updateSessionBadge();
+}
+
+function onGroupFilterChange() { updateSessionBadge(); }
+
+function updateSessionBadge() {
+  const badge     = document.getElementById("sessionBadge");
+  if (!badge) return;
+  const groupSel  = document.getElementById("scannerGroupFilter");
+  const groupVal  = groupSel ? (groupSel.value || "All Groups") : "All Groups";
+  const icons     = { Theory: "🌅", TP1: "①", TP2: "②", TP3: "③" };
+  badge.textContent = `${icons[currentClassType] || "📋"} ${currentClassType}  ·  👥 ${groupVal}`;
+}
+
 function populateScannerGroupFilter() {
   const sel = document.getElementById("scannerGroupFilter");
   if (!sel) return;
   const groups = [...new Set(DB.students.map(s => s.group).filter(Boolean))];
-  sel.innerHTML = '<option value="">🌐 All Groups (Morning / Full Class)</option>' +
+  sel.innerHTML = '<option value="">🌐 All Groups</option>' +
     groups.map(g => `<option value="${escapeAttr(g)}">${escapeHtml(g)}</option>`).join("");
+  // Re-apply current class type state
+  selectClassType(currentClassType);
 }
 
 function bindScannerButtons() {
@@ -731,16 +794,19 @@ async function handleScannedId(studentId) {
   const resultCard = document.getElementById("scanResultCard");
   resultCard.innerHTML = `<div class="scan-result-placeholder">Processing ${escapeHtml(studentId)}…</div>`;
 
-  // Group filter check (client-side, instant)
-  const selectedGroup = document.getElementById("scannerGroupFilter")?.value || "";
-  if (selectedGroup) {
+  const isTheory     = currentClassType === "Theory";
+  const groupSel     = document.getElementById("scannerGroupFilter");
+  const selectedGroup = (!isTheory && groupSel) ? (groupSel.value || "") : "";
+
+  // Client-side group rejection for TP sessions
+  if (!isTheory && selectedGroup) {
     const student = DB.students.find(s => String(s.studentId).trim() === String(studentId).trim());
     if (student && student.group !== selectedGroup) {
       playRejectSound();
       resultCard.innerHTML = `
         <div class="scan-result-reject">
           <div class="scan-result-icon">🚫</div>
-          <h3>Group Rejected</h3>
+          <h3>Wrong Group</h3>
           <div class="scan-identity">
             <div class="scan-avatar">${escapeHtml(getInitials(student.firstName + " " + student.lastName))}</div>
             <div class="scan-identity-text">
@@ -748,14 +814,18 @@ async function handleScannedId(studentId) {
               <div class="scan-group-badge scan-group-badge-reject">${escapeHtml(student.group)}</div>
             </div>
           </div>
-          <p class="muted">This session is for <strong>${escapeHtml(selectedGroup)}</strong> only.</p>
+          <p class="muted">This ${escapeHtml(currentClassType)} session is for <strong>${escapeHtml(selectedGroup)}</strong> only.</p>
         </div>`;
       return;
     }
   }
 
   try {
-    const res = await apiPost("addAttendance", { studentId });
+    const res = await apiPost("addAttendance", {
+      studentId,
+      sessionType:  currentClassType,
+      groupFilter:  selectedGroup
+    });
     if (res.success) {
       const d = res.data;
       playSuccessSound();
@@ -767,10 +837,10 @@ async function handleScannedId(studentId) {
             <div class="scan-avatar">${escapeHtml(getInitials(d.studentName))}</div>
             <div class="scan-identity-text">
               <div class="scan-fullname">${escapeHtml(d.studentName)}</div>
-              <div class="scan-group-badge">${escapeHtml(d.studentGroup||"No Group")}</div>
+              <div class="scan-group-badge">${escapeHtml(d.studentGroup || "No Group")}</div>
             </div>
           </div>
-          <p class="muted">${escapeHtml(d.courseName||"")} • ${escapeHtml(d.time)}</p>
+          <p class="muted">${escapeHtml(d.sessionType)} · ${escapeHtml(d.courseName || "")} · ${escapeHtml(d.time)}</p>
         </div>`;
     } else if (res.code === "ALREADY_CHECKED_IN") {
       const d = res.data || {};
@@ -780,10 +850,10 @@ async function handleScannedId(studentId) {
           <div class="scan-result-icon">⚠️</div>
           <h3>Already Checked In</h3>
           <div class="scan-identity">
-            <div class="scan-avatar">${escapeHtml(getInitials(d.studentName||studentId))}</div>
+            <div class="scan-avatar">${escapeHtml(getInitials(d.studentName || studentId))}</div>
             <div class="scan-identity-text">
-              <div class="scan-fullname">${escapeHtml(d.studentName||studentId)}</div>
-              <div class="scan-group-badge">${escapeHtml(d.studentGroup||"No Group")}</div>
+              <div class="scan-fullname">${escapeHtml(d.studentName || studentId)}</div>
+              <div class="scan-group-badge">${escapeHtml(d.studentGroup || "No Group")}</div>
             </div>
           </div>
           <p class="muted">${escapeHtml(res.message)}</p>
@@ -794,7 +864,7 @@ async function handleScannedId(studentId) {
         <div class="scan-result-error">
           <div class="scan-result-icon">❌</div>
           <h3>Check-in Failed</h3>
-          <p>${escapeHtml(res.message||"Unknown error")}</p>
+          <p>${escapeHtml(res.message || "Unknown error")}</p>
         </div>`;
     }
     refreshAttendanceOnly();
@@ -803,6 +873,7 @@ async function handleScannedId(studentId) {
     resultCard.innerHTML = `<div class="scan-result-error"><div class="scan-result-icon">❌</div><h3>Error</h3><p>${escapeHtml(err.message)}</p></div>`;
   }
 }
+
 
 function getInitials(name) {
   if (!name) return "?";
@@ -816,15 +887,18 @@ function renderRecentAttendance() {
   const todayStr = formatDate(new Date());
   const groupMap = {};
   DB.students.forEach(s => groupMap[s.studentId] = s.group);
+  const sessionIcons = { Theory: "🌅", TP1: "① TP1", TP2: "② TP2", TP3: "③ TP3" };
 
   DB.attendance.filter(a => a.date === todayStr)
-    .sort((a, b) => (b.timestamp||"").localeCompare(a.timestamp||""))
+    .sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""))
     .forEach(a => {
       const tr = document.createElement("tr");
+      const sessionLabel = sessionIcons[a.sessionType] || (a.sessionType || "–");
       tr.innerHTML = `
         <td>${escapeHtml(a.studentId)}</td>
         <td>${escapeHtml(a.studentName)}</td>
-        <td>${escapeHtml(groupMap[a.studentId]||"")}</td>
+        <td>${escapeHtml(groupMap[a.studentId] || "")}</td>
+        <td><span class="session-tag session-tag-${escapeAttr(a.sessionType || "Theory")}">${escapeHtml(sessionLabel)}</span></td>
         <td>${escapeHtml(a.date)}</td>
         <td>${escapeHtml(a.time)}</td>`;
       tbody.appendChild(tr);

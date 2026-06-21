@@ -10,7 +10,7 @@
  * Sheets required (auto-created on first run by ensureSheets()):
  *   - Students   : StudentID | FirstName | LastName | Email | Phone | Group | QRCodeURL | CreatedAt
  *   - Courses    : CourseID | CourseName | Subject | Group | Teacher | Duration | StartDate | EndDate | Status | CreatedAt
- *   - Attendance : AttendanceID | StudentID | StudentName | CourseID | CourseName | Date | Time | Timestamp
+ *   - Attendance : AttendanceID | StudentID | StudentName | CourseID | CourseName | SessionType | GroupFilter | Date | Time | Timestamp
  * ===================================================================
  */
 
@@ -86,7 +86,7 @@ function ensureSheets() {
   }
   if (!ss.getSheetByName(SHEET_ATTENDANCE)) {
     ss.insertSheet(SHEET_ATTENDANCE)
-      .appendRow(["AttendanceID","StudentID","StudentName","CourseID","CourseName","Date","Time","Timestamp"]);
+      .appendRow(["AttendanceID","StudentID","StudentName","CourseID","CourseName","SessionType","GroupFilter","Date","Time","Timestamp"]);
   }
 }
 
@@ -134,7 +134,7 @@ function camelCase(header) {
     "CourseID": "courseId", "CourseName": "courseName", "Subject": "subject",
     "Teacher": "teacher", "Duration": "duration", "StartDate": "startDate", "EndDate": "endDate", "Status": "status",
     "AttendanceID": "attendanceId", "Date": "date", "Time": "time", "Timestamp": "timestamp",
-    "StudentName": "studentName"
+    "StudentName": "studentName", "SessionType": "sessionType", "GroupFilter": "groupFilter"
   };
   return map[header] || header;
 }
@@ -265,19 +265,10 @@ function getAttendance() {
 }
 
 function addAttendance(p) {
-  // ---------------------------------------------------------------
-  // Performance strategy:
-  // 1. Read Students sheet ONCE — find the student row in memory.
-  // 2. Read Attendance sheet ONCE — check for duplicate in memory.
-  // 3. Use cached active course — no extra Courses sheet read.
-  // 4. Single appendRow write at the end.
-  // All in one execution = 2 sheet reads + 1 write (was 4+ reads before).
-  // ---------------------------------------------------------------
-
   const studentsSheet   = getSheet(SHEET_STUDENTS);
   const attendanceSheet = getSheet(SHEET_ATTENDANCE);
 
-  // --- 1. Validate student (single read) ---
+  // --- 1. Validate student ---
   const { data: studentsData } = readSheet(studentsSheet);
   const sIdx = findInData(studentsData, 0, p.studentId);
   if (sIdx === -1) {
@@ -287,7 +278,11 @@ function addAttendance(p) {
   const studentName  = (String(sr[1]) + " " + String(sr[2])).trim();
   const studentGroup = String(sr[5] || "");
 
-  // --- 2. Get active course (cached) ---
+  // --- 2. Session info ---
+  const sessionType = p.sessionType || "Theory";
+  const groupFilter = p.groupFilter || "";
+
+  // --- 3. Get active course (cached) ---
   const activeCourse = getActiveCourse();
   if (!activeCourse) {
     return { success: false, message: "No active (Ongoing) course found" };
@@ -298,26 +293,30 @@ function addAttendance(p) {
   const todayStr = Utilities.formatDate(now, tz, "yyyy-MM-dd");
   const timeStr  = Utilities.formatDate(now, tz, "HH:mm:ss");
 
-  // --- 3. Duplicate check (single read) ---
-  // Columns: [0]AttendanceID [1]StudentID [2]StudentName [3]CourseID [4]CourseName [5]Date [6]Time [7]Timestamp
+  // --- 4. Duplicate check: same student + same sessionType + same date ---
+  // Columns: [0]AttendanceID [1]StudentID [2]StudentName [3]CourseID [4]CourseName [5]SessionType [6]GroupFilter [7]Date [8]Time [9]Timestamp
   const { data: attData } = readSheet(attendanceSheet);
   for (let i = 0; i < attData.length; i++) {
     const row = attData[i];
-    if (String(row[1]) === String(p.studentId) && formatCell(row[5]) === todayStr) {
+    const rowStudentId   = String(row[1]);
+    const rowSessionType = String(row[5] || "Theory");
+    const rowDate        = formatCell(row[7]);
+    if (rowStudentId === String(p.studentId) && rowSessionType === sessionType && rowDate === todayStr) {
       return {
         success: false,
         code: "ALREADY_CHECKED_IN",
-        message: "Already Checked In today at " + String(row[6]),
+        message: "Already checked in for " + sessionType + " today at " + String(row[8]),
         data: { studentId: p.studentId, studentName, studentGroup }
       };
     }
   }
 
-  // --- 4. Write attendance ---
+  // --- 5. Write ---
   const attendanceId = "ATT" + now.getTime();
   attendanceSheet.appendRow([
     attendanceId, p.studentId, studentName,
     activeCourse.courseId, activeCourse.courseName,
+    sessionType, groupFilter,
     todayStr, timeStr, now.toISOString()
   ]);
 
@@ -326,7 +325,7 @@ function addAttendance(p) {
     data: {
       attendanceId, studentId: p.studentId, studentName, studentGroup,
       courseId: activeCourse.courseId, courseName: activeCourse.courseName,
-      date: todayStr, time: timeStr
+      sessionType, date: todayStr, time: timeStr
     }
   };
 }
