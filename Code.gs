@@ -122,6 +122,14 @@ function sheetToObjects(sheet) {
 
 function formatCell(val) {
   if (val instanceof Date) {
+    // Google Sheets stores time-only values as Date objects anchored to 1899-12-30.
+    // Detect this and format as HH:mm:ss instead of a date string.
+    if (val.getFullYear() === 1899 && val.getMonth() === 11 && val.getDate() === 30) {
+      const hh = String(val.getHours()).padStart(2, "0");
+      const mm = String(val.getMinutes()).padStart(2, "0");
+      const ss = String(val.getSeconds()).padStart(2, "0");
+      return hh + ":" + mm + ":" + ss;
+    }
     return Utilities.formatDate(val, Session.getScriptTimeZone(), "yyyy-MM-dd");
   }
   return val;

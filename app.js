@@ -711,7 +711,7 @@ function updateSessionBadge() {
   if (!badge) return;
   const groupSel  = document.getElementById("scannerGroupFilter");
   const groupVal  = groupSel ? (groupSel.value || "All Groups") : "All Groups";
-  const icons     = { Theory: "📖", TP1: "🔬", TP2: "🔬", TP3: "🔬" };
+  const icons     = { Theory: "🌅", TP1: "①", TP2: "②", TP3: "③" };
   badge.textContent = `${icons[currentClassType] || "📋"} ${currentClassType}  ·  👥 ${groupVal}`;
 }
 
@@ -900,7 +900,7 @@ function renderRecentAttendance() {
         <td>${escapeHtml(groupMap[a.studentId] || "")}</td>
         <td><span class="session-tag session-tag-${escapeAttr(a.sessionType || "Theory")}">${escapeHtml(sessionLabel)}</span></td>
         <td>${escapeHtml(a.date)}</td>
-        <td>${escapeHtml(a.time)}</td>`;
+        <td>${escapeHtml((a.time || "").slice(0, 5))}</td>`;
       tbody.appendChild(tr);
     });
 }
